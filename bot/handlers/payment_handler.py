@@ -7,6 +7,52 @@ import json
 # Conversation states
 EWALLET_PHONE = 1
 
+async def purchase_with_balance(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                               session: dict, option_code: str, price: int, item_name: str):
+    """Wrapper untuk purchase with balance dari package_handler"""
+    package_info = {
+        'option_code': option_code,
+        'price': price,
+        'family_name': item_name
+    }
+    await execute_balance_purchase(update, context, session, package_info)
+
+
+async def purchase_with_ewallet(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                                session: dict, option_code: str, price: int, item_name: str):
+    """Wrapper untuk purchase with ewallet dari package_handler"""
+    package_info = {
+        'option_code': option_code,
+        'price': price,
+        'family_name': item_name
+    }
+    
+    query = update.callback_query
+    text = "💳 <b>Pilih E-Wallet</b>\n\n"
+    text += "Pilih metode pembayaran:"
+    
+    keyboard = [
+        [InlineKeyboardButton("DANA", callback_data="confirm_ewallet_dana")],
+        [InlineKeyboardButton("OVO", callback_data="confirm_ewallet_ovo")],
+        [InlineKeyboardButton("ShopeePay", callback_data="confirm_ewallet_shopeepay")],
+        [InlineKeyboardButton("GoPay", callback_data="confirm_ewallet_gopay")],
+        [InlineKeyboardButton("🔙 Kembali", callback_data="pkg_hot")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
+
+
+async def purchase_with_qris(update: Update, context: ContextTypes.DEFAULT_TYPE,
+                             session: dict, option_code: str, price: int, item_name: str):
+    """Wrapper untuk purchase with qris dari package_handler"""
+    package_info = {
+        'option_code': option_code,
+        'price': price,
+        'family_name': item_name
+    }
+    await execute_qris_purchase(update, context, session, package_info)
+
 
 async def handle_payment_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle payment confirmation"""

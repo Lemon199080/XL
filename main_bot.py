@@ -31,6 +31,12 @@ from bot.handlers import (
     help_handler,
     payment_handler,
 )
+from bot.handlers import admin_handler
+from bot.handlers.admin_handler import (
+    ADMIN_ADD_FAMILY,
+    ADMIN_ADD_VARIANT,
+    ADMIN_ADD_ORDER
+)
 from bot.database import init_db
 
 # Import state dari login_handler biar konsisten
@@ -83,6 +89,43 @@ def main() -> None:
     application.add_handler(CommandHandler("profile", profile_handler.show_profile))
     application.add_handler(CommandHandler("cancel", start_handler.cancel))
     application.add_handler(CommandHandler("db", db_command))
+    application.add_handler(CommandHandler("admin", admin_handler.admin_menu))
+
+    # =====================================================================
+    # Admin ConversationHandler (untuk add hot packages)
+    # =====================================================================
+    admin_conv_handler = ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(
+                admin_handler.start_add_hot,
+                pattern="^admin_add_hot$"
+            )
+        ],
+        states={
+            ADMIN_ADD_FAMILY: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    admin_handler.receive_family_code
+                )
+            ],
+            ADMIN_ADD_VARIANT: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    admin_handler.receive_variant_choice
+                )
+            ],
+            ADMIN_ADD_ORDER: [
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    admin_handler.receive_option_choice
+                )
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", admin_handler.cancel_add_hot)
+        ],
+    )
+    application.add_handler(admin_conv_handler)
 
     # =====================================================================
     # Login ConversationHandler
@@ -153,7 +196,13 @@ def main() -> None:
     application.add_handler(
         CallbackQueryHandler(
             package_handler.handle_hot_packages,
-            pattern="^hot_",
+            pattern="^hot_select_",
+        )
+    )
+    application.add_handler(
+        CallbackQueryHandler(
+            package_handler.handle_hot2_packages,
+            pattern="^hot2_",
         )
     )
     application.add_handler(
@@ -226,6 +275,14 @@ def main() -> None:
         CallbackQueryHandler(
             account_handler.handle_account_action,
             pattern="^acc_",
+        )
+    )
+
+    # Admin
+    application.add_handler(
+        CallbackQueryHandler(
+            admin_handler.handle_admin_callback,
+            pattern="^admin_",
         )
     )
 

@@ -16,6 +16,8 @@ async def handle_package_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     if action == "hot":
         await show_hot_packages(update, context)
+    elif action == "hot2":
+        await show_hot2_packages(update, context)
     elif action == "store":
         await show_store_menu(update, context)
     elif action == "segments":
@@ -60,6 +62,8 @@ async def show_hot_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
+    loading_msg = await query.edit_message_text("⏳ Memuat paket...")
+    
     try:
         with open("hot_data/hot.json", "r", encoding="utf-8") as f:
             hot_packages = json.load(f)
@@ -83,14 +87,70 @@ async def show_hot_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard.append([InlineKeyboardButton("🔙 Kembali", callback_data="menu_back")])
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(
+        await loading_msg.edit_text(
             text,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
         
     except Exception as e:
+        await loading_msg.edit_text(
+            f"❌ Gagal memuat paket: {str(e)}\n\n"
+            "Gunakan /start untuk kembali."
+        )
+
+
+async def show_hot2_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show hot2 packages (bundle packages)"""
+    query = update.callback_query
+    user = update.effective_user
+    
+    session = get_user_session(user.id)
+    if not session:
         await query.edit_message_text(
+            "❌ Sesi berakhir. Silakan /login kembali."
+        )
+        return
+    
+    loading_msg = await query.edit_message_text("⏳ Memuat paket...")
+    
+    try:
+        with open("hot_data/hot2.json", "r", encoding="utf-8") as f:
+            hot2_packages = json.load(f)
+        
+        text = "🔥🔥 <b>Paket Hot2 (Bundle)</b>\n\n"
+        text += "Paket bundle dengan harga spesial:\n\n"
+        
+        keyboard = []
+        for idx, pkg in enumerate(hot2_packages[:10]):
+            name = pkg.get('name', 'N/A')
+            price = pkg.get('price', 'N/A')
+            detail = pkg.get('detail', '')
+            
+            text += f"{idx+1}. <b>{name}</b>\n"
+            text += f"   💰 {price}\n"
+            if detail:
+                # Show first line of detail only
+                first_line = detail.split('\n')[0]
+                text += f"   📝 {first_line[:40]}...\n"
+            text += "\n"
+            
+            keyboard.append([InlineKeyboardButton(
+                f"{idx+1}. {name[:30]}",
+                callback_data=f"hot2_select_{idx}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("🔙 Kembali", callback_data="pkg_store")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await loading_msg.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+    except Exception as e:
+        await loading_msg.edit_text(
             f"❌ Gagal memuat paket: {str(e)}\n\n"
             "Gunakan /start untuk kembali."
         )
@@ -127,6 +187,8 @@ async def handle_hot_packages(update: Update, context: ContextTypes.DEFAULT_TYPE
             
             from app.client.engsel import get_family
             
+            loading_msg = await query.edit_message_text("⏳ Memuat detail paket...")
+            
             family_data = get_family(
                 session['api_key'],
                 session['tokens'],
@@ -135,7 +197,7 @@ async def handle_hot_packages(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             
             if not family_data:
-                await query.edit_message_text("❌ Gagal memuat detail paket.")
+                await loading_msg.edit_text("❌ Gagal memuat detail paket.")
                 return
             
             option_code = None
@@ -149,10 +211,124 @@ async def handle_hot_packages(update: Update, context: ContextTypes.DEFAULT_TYPE
             if option_code:
                 await show_package_detail(update, context, option_code)
             else:
-                await query.edit_message_text("❌ Paket tidak ditemukan.")
+                await loading_msg.edit_text("❌ Paket tidak ditemukan.")
                 
         except Exception as e:
             await query.edit_message_text(f"❌ Error: {str(e)}")
+
+
+async def handle_hot2_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle hot2 package selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    user = update.effective_user
+    session = get_user_session(user.id)
+    
+    if not session:
+        await query.edit_message_text(
+            "❌ Sesi berakhir. Silakan /login kembali."
+        )
+        return
+    
+    action = query.data.replace("hot2_", "")
+    
+    if action.startswith("select_"):
+        try:
+            idx = int(action.replace("select_", ""))
+            
+            with open("hot_data/hot2.json", "r", encoding="utf-8") as f:
+                hot2_packages = json.load(f)
+            
+            if idx >= len(hot2_packages):
+                await query.edit_message_text("❌ Paket tidak ditemukan.")
+                return
+            
+            selected = hot2_packages[idx]
+            
+            # Show hot2 package detail
+            await show_hot2_detail(update, context, selected, idx)
+                
+        except Exception as e:
+            await query.edit_message_text(f"❌ Error: {str(e)}")
+
+
+async def show_hot2_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, package_data: dict, idx: int):
+    """Show hot2 package detail"""
+    query = update.callback_query
+    user = update.effective_user
+    
+    session = get_user_session(user.id)
+    if not session:
+        await query.edit_message_text("❌ Sesi berakhir. Silakan /login kembali.")
+        return
+    
+    loading_msg = await query.edit_message_text("⏳ Memuat detail paket...")
+    
+    try:
+        from app.client.engsel import get_package_details
+        
+        name = package_data.get('name', 'N/A')
+        price = package_data.get('price', 'N/A')
+        detail = package_data.get('detail', '')
+        packages = package_data.get('packages', [])
+        payment_for = package_data.get('payment_for', 'BUY_PACKAGE')
+        
+        # Get first package details for display
+        main_package_detail = None
+        if packages:
+            first_pkg = packages[0]
+            main_package_detail = get_package_details(
+                session['api_key'],
+                session['tokens'],
+                first_pkg['family_code'],
+                first_pkg['variant_code'],
+                first_pkg['order'],
+                first_pkg.get('is_enterprise'),
+                first_pkg.get('migration_type')
+            )
+        
+        text = f"🔥🔥 <b>{name}</b>\n"
+        text += "━━━━━━━━━━━━━━━━━━━━\n\n"
+        text += f"<b>Harga:</b> {price}\n\n"
+        
+        if detail:
+            text += f"<b>Detail:</b>\n{detail}\n\n"
+        
+        text += f"<b>Bundle berisi {len(packages)} paket:</b>\n"
+        for i, pkg in enumerate(packages, 1):
+            option_name = pkg.get('option_name', 'N/A')
+            if option_name:
+                text += f"{i}. {option_name}\n"
+        
+        text += "\n━━━━━━━━━━━━━━━━━━━━"
+        
+        # Store package data for purchase
+        context.user_data['current_hot2_package'] = {
+            'data': package_data,
+            'idx': idx
+        }
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("💰 Pulsa", callback_data=f"buy_hot2_balance"),
+                InlineKeyboardButton("💳 E-Wallet", callback_data=f"buy_hot2_ewallet")
+            ],
+            [
+                InlineKeyboardButton("📱 QRIS", callback_data=f"buy_hot2_qris")
+            ],
+            [InlineKeyboardButton("🔙 Kembali", callback_data="pkg_hot2")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await loading_msg.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode='HTML'
+        )
+        
+    except Exception as e:
+        await loading_msg.edit_text(f"❌ Error: {str(e)}")
 
 
 async def show_package_detail(update: Update, context: ContextTypes.DEFAULT_TYPE, 
@@ -168,6 +344,8 @@ async def show_package_detail(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
     
+    loading_msg = await query.edit_message_text("⏳ Memuat detail paket...")
+    
     try:
         from app.client.engsel import get_package
         
@@ -178,7 +356,7 @@ async def show_package_detail(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         
         if not package:
-            await query.edit_message_text("❌ Gagal memuat detail paket.")
+            await loading_msg.edit_text("❌ Gagal memuat detail paket.")
             return
         
         family_name = package.get('package_family', {}).get('name', 'N/A')
@@ -237,14 +415,14 @@ async def show_package_detail(update: Update, context: ContextTypes.DEFAULT_TYPE
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await query.edit_message_text(
+        await loading_msg.edit_text(
             text,
             reply_markup=reply_markup,
             parse_mode='HTML'
         )
         
     except Exception as e:
-        await query.edit_message_text(f"❌ Error: {str(e)}")
+        await loading_msg.edit_text(f"❌ Error: {str(e)}")
 
 
 async def show_my_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -260,6 +438,11 @@ async def show_my_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(text)
         return
+    
+    if query:
+        loading_msg = await query.edit_message_text("⏳ Memuat paket...")
+    else:
+        loading_msg = await update.message.reply_text("⏳ Memuat paket...")
     
     try:
         from app.client.engsel import send_api_request
@@ -309,17 +492,11 @@ async def show_my_packages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("🔙 Kembali", callback_data="menu_back")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        if query:
-            await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
-        else:
-            await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='HTML')
+        await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='HTML')
             
     except Exception as e:
         text = f"❌ Error: {str(e)}"
-        if query:
-            await query.edit_message_text(text)
-        else:
-            await update.message.reply_text(text)
+        await loading_msg.edit_text(text)
 
 
 async def show_bookmarks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -361,7 +538,10 @@ async def show_store_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "🛒 <b>Semua Paket</b>\n\nPilih kategori:"
     
     keyboard = [
-        [InlineKeyboardButton("🔥 Hot Packages", callback_data="pkg_hot")],
+        [
+            InlineKeyboardButton("🔥 Hot", callback_data="pkg_hot"),
+            InlineKeyboardButton("🔥🔥 Hot2", callback_data="pkg_hot2")
+        ],
         [InlineKeyboardButton("📊 Store Segments", callback_data="pkg_segments")],
         [InlineKeyboardButton("🔍 Family Code", callback_data="pkg_family_search")],
         [InlineKeyboardButton("🔙 Kembali", callback_data="menu_back")]
@@ -383,13 +563,15 @@ async def show_store_segments(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("❌ Sesi berakhir. Silakan /login kembali.")
         return
     
+    loading_msg = await query.edit_message_text("⏳ Memuat segments...")
+    
     try:
         from app.client.store.segments import get_segments
         
         segments_res = get_segments(session['api_key'], session['tokens'], False)
         
         if not segments_res or segments_res.get('status') != 'SUCCESS':
-            await query.edit_message_text("❌ Gagal memuat segments")
+            await loading_msg.edit_text("❌ Gagal memuat segments")
             return
         
         segments = segments_res.get('data', {}).get('store_segments', [])
@@ -436,10 +618,10 @@ async def show_store_segments(update: Update, context: ContextTypes.DEFAULT_TYPE
             keyboard.append([InlineKeyboardButton("🔙 Kembali", callback_data="pkg_store")])
         
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='HTML')
+        await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode='HTML')
         
     except Exception as e:
-        await query.edit_message_text(f"❌ Error: {str(e)}")
+        await loading_msg.edit_text(f"❌ Error: {str(e)}")
 
 
 async def show_family_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -726,12 +908,32 @@ async def handle_purchase(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Sesi berakhir. Silakan /login kembali.")
         return
     
+    action = query.data.replace("buy_", "")
+    
+    # Check if it's hot2 package
+    if action.startswith("hot2_"):
+        hot2_data = context.user_data.get('current_hot2_package')
+        if not hot2_data:
+            await query.answer("❌ Data paket tidak ditemukan", show_alert=True)
+            return
+        
+        package_data = hot2_data['data']
+        
+        # For hot2, we'll implement purchase later
+        # For now, just show info
+        await query.answer(
+            "🚧 Fitur pembelian Hot2 dalam pengembangan.\n"
+            "Silakan gunakan CLI untuk saat ini.",
+            show_alert=True
+        )
+        return
+    
+    # Regular package purchase
     package_info = context.user_data.get('current_package')
     if not package_info:
         await query.answer("❌ Data paket tidak ditemukan", show_alert=True)
         return
     
-    action = query.data.replace("buy_", "")
     option_code = package_info['option_code']
     price = package_info['price']
     item_name = f"{package_info['family_name']} - {package_info['option_name']}"

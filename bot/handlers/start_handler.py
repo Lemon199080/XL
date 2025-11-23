@@ -108,22 +108,33 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             InlineKeyboardButton("📦 Paket Saya", callback_data="menu_my_packages"),
         ],
         [
-            InlineKeyboardButton("🔥 Paket Hot", callback_data="pkg_hot"),
+            InlineKeyboardButton("🔥 Hot", callback_data="pkg_hot"),
+            InlineKeyboardButton("🔥 Hot2", callback_data="pkg_hot2"),
+        ],
+        [
             InlineKeyboardButton("🛒 Semua Paket", callback_data="pkg_store"),
+            InlineKeyboardButton("⭐ Bookmark", callback_data="pkg_bookmark"),
         ],
         [
-            InlineKeyboardButton("Riwayat", callback_data="trx_history"),
-            InlineKeyboardButton("Bookmark", callback_data="pkg_bookmark"),
+            InlineKeyboardButton("📋 Riwayat", callback_data="trx_history"),
+            InlineKeyboardButton("👨‍👩‍👧 Family", callback_data="fam_info"),
         ],
         [
-            InlineKeyboardButton("Family Plan", callback_data="fam_info"),
-            InlineKeyboardButton("Circle", callback_data="circle_info"),
-        ],
-        [
+            InlineKeyboardButton("⭕ Circle", callback_data="circle_info"),
             InlineKeyboardButton("⚙️ Akun", callback_data="menu_accounts"),
+        ],
+        [
             InlineKeyboardButton("❓ Help", callback_data="menu_help"),
         ],
     ]
+    
+    # Add admin button for admin users
+    from bot.handlers.admin_handler import is_admin
+    if is_admin(user.id):
+        keyboard.append([
+            InlineKeyboardButton("👑 Admin Panel", callback_data="admin_menu")
+        ])
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     menu_text = (

@@ -21,6 +21,14 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(text)
         return
 
+    # Show loading
+    from bot.loading import show_loading
+    
+    if query:
+        loading_msg = await query.edit_message_text("⏳ Memuat profil...")
+    else:
+        loading_msg = await update.message.reply_text("⏳ Memuat profil...")
+
     try:
         from app.client.engsel import get_balance, get_tiering_info
 
@@ -103,23 +111,16 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        if query:
-            await query.edit_message_text(
-                text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-        else:
-            await update.message.reply_text(
-                text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
+        await loading_msg.edit_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+        )
 
     except Exception as e:
         err = escape(str(e))
         text = f"❌ Gagal memuat profil:\n{err}"
-        if query:
-            await query.edit_message_text(text, parse_mode="HTML")
-        else:
-            await update.message.reply_text(text, parse_mode="HTML")
+        keyboard = [[InlineKeyboardButton("🔙 Kembali", callback_data="menu_back")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await loading_msg.edit_text(text, reply_markup=reply_markup, parse_mode="HTML")
